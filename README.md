@@ -192,3 +192,8 @@ Currently partially supported:
 * Vite
 * Univer Docs
 * JSZip
+
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/b2f08ce3-7558-4dc1-8fdc-8f3166d10bb2" />
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/2c23d9d8-beb0-4a67-90d7-ef93f7ecd6e2" />
+
+
