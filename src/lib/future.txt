@@ -1,0 +1,71 @@
+/**
+ * ============================================================================
+ * UNIVER DOCX PARSER HIGH-FIDELITY IMPLEMENTATION ROADMAP
+ * ============================================================================
+ * * To transition from the current linear text-stream approach to a high-fidelity,
+ * editable layout engine, the following structural transformations must be made.
+ * * ----------------------------------------------------------------------------
+ * 1. STRUCTURAL BODY NODE ITERATOR (Foundation for Tables & Block Images)
+ * ----------------------------------------------------------------------------
+ * LOCATION: `lib/docxParser.ts` -> Inside `parseDocxToUniver()`
+ * CURRENT PROBLEM: `wTags(body, "p")` flattens the tree, destroying table grids.
+ * APPROACH: Replace with an explicit child-node structural loop:
+ * * const bodyChildren = Array.from(body.children);
+ * for (const child of bodyChildren) {
+ * if (child.localName === "p") {
+ * processParagraph(child); // Handles standard text, headings, lists, inline media
+ * } else if (child.localName === "tbl") {
+ * processTable(child);     // Handles standard/nested tables & cellular matrices
+ * }
+ * }
+ * * ----------------------------------------------------------------------------
+ * 2. LISTS & MULTI-LEVEL ALIGNMENT
+ * ----------------------------------------------------------------------------
+ * LOCATION: `lib/docxParser.ts` -> Inside `parseParagraphStyle()`
+ * APPROACH: Intercept `<w:numPr>` within the paragraph properties block.
+ * - Map `<w:numId>` (list style mapping group) and `<w:ilvl>` (indentation depth, 0-8).
+ * - Match with native Univer `paragraphStyle.list` configurations.
+ * - Next phase requires unzipping `word/numbering.xml` at setup to read the 
+ * abstract numbering formats (bullet tokens, decimal chains like 1.1.1, etc.)
+ * to ensure list items behave natively when a user presses [Enter] or [Tab].
+ * * ----------------------------------------------------------------------------
+ * 3. TABLES (Header Rows, Cellular Styling, and Grid Merging)
+ * ----------------------------------------------------------------------------
+ * LOCATION: `lib/docxParser.ts` -> Create helper function `processTable(tblEl: Element)`
+ * APPROACH: Map nested hierarchies sequentially: `tbl` -> `tr` (Row) -> `tc` (Cell) -> `p` (Inner Blocks).
+ * - Row Heights & Headers: Read `<w:trHeight>` and check for `<w:tblHeader/>` inside row props (`<w:trPr>`).
+ * - Cell Formatting & Borders: Extract `<w:shd>` (shading hex color) and `<w:tcBorders>` inside cell props (`<w:tcPr>`).
+ * - Matrix Grid Merges (Complex Layouts): 
+ * * Horizontal: Parse cell attribute `<w:gridSpan w:val="X" />` (columns spanned).
+ * * Vertical: Parse `<w:vMerge w:val="restart|continue" />`.
+ * * Grid Resolution: Build a virtual tracking grid state array while executing, allowing
+ * Univer to generate proper rectangular cell merge structures over the layout coordinates.
+ * * ----------------------------------------------------------------------------
+ * 4. STRUCTURAL FLOW BREAKERS (Hyperlinks, TOC, Footnotes)
+ * ----------------------------------------------------------------------------
+ * LOCATION: `lib/docxParser.ts` -> Inside text run iterator blocks.
+ * APPROACH:
+ * - Hyperlinks: Intercept `<w:hyperlink>` elements surrounding inner runs. Resolve the
+ * target relation identity `r:id` via `word/_rels/document.xml.rels` maps and apply
+ * `textRun.ts.link = { url: targetUrl }` to make it natively interactive.
+ * - Table of Contents (Field Codes): Track an `isInFieldCode` boolean state switch. 
+ * When matching `<w:fldChar w:fldCharType="begin"/>` containing a `TOC` instructional string,
+ * isolate or clear out the static legacy cache runs until hitting `w:fldCharType="end"` 
+ * to let Univer dynamically manage its internal indexing.
+ * - Footnotes / Endnotes: Catch anchor nodes like `<w:footnoteReference w:id="X"/>`. Pre-parse 
+ * `word/footnotes.xml` at engine load, storing references inside an operational Map, and append 
+ * the body data stream fragments directly into Univer's structural footnote allocation registry.
+ * * ----------------------------------------------------------------------------
+ * 5. MEDIA ASSETS (Inline & Floating Canvas Drawings)
+ * ----------------------------------------------------------------------------
+ * LOCATION: `lib/docxParser.ts` -> Inside paragraph run loops or immediate child node blocks.
+ * APPROACH: Parse `<w:drawing>` layouts.
+ * - Map the embedded resource relation identifier (`rId`) back to the zipped binary location 
+ * via document relations data (e.g. `word/media/image1.png`).
+ * - Fetch the file blob via `JSZip`, convert it to a secure Base64 Data URI, and load it into 
+ * Univer's image registry.
+ * - Sizing: Convert raw OpenXML metric dimensions (EMUs) directly to UI points (1 pt = 12,700 EMUs).
+ * - Placement: Block/Inline elements stay inside the text stream. Floating diagrams require positioning 
+ * attributes (`wp:positionH`, `wp:positionV`) to draw over the structural layer canvas.
+ * ============================================================================
+ */
